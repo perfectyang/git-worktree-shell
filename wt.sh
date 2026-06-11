@@ -216,8 +216,6 @@ interactive_remove() {
         exit 0
     fi
 
-    header "选择要删除的 worktree（↑↓ 移动，空格选择/取消，回车确认）"
-
     local -a selected=()
     for ((i = 0; i < ${#paths[@]}; i++)); do
         selected+=("false")
@@ -226,15 +224,38 @@ interactive_remove() {
     local current=0
     local key
     local extra
+    local scroll_offset=0
+    local term_lines
+    term_lines=$(tput lines)
 
     # 隐藏光标，设置退出时自动恢复
     tput civis
     trap 'tput cnorm 2>/dev/null || true' EXIT
+    # 在标题前保存光标位置，用于每次重绘时恢复
     tput sc
 
     render_list() {
+        local max_visible=$(( term_lines - 3 ))
+        (( max_visible < 3 )) && max_visible=3
+
+        # 调整滚动偏移，确保当前项可见
+        if (( current < scroll_offset )); then
+            scroll_offset=$current
+        elif (( current >= scroll_offset + max_visible )); then
+            scroll_offset=$(( current - max_visible + 1 ))
+        fi
+
         tput rc
-        for ((i = 0; i < ${#paths[@]}; i++)); do
+        # 清空从光标位置到屏幕底部，避免旧内容残留
+        printf "\033[J"
+
+        # 重新打印标题，固定在交互区域顶部
+        printf "\n${BOLD}${BLUE}%s${NC}\n" "选择要删除的 worktree（↑↓ 移动，空格选择/取消，回车确认）"
+
+        local end_idx=$(( scroll_offset + max_visible ))
+        (( end_idx > ${#paths[@]} )) && end_idx=${#paths[@]}
+
+        for (( i = scroll_offset; i < end_idx; i++ )); do
             local mark=" "
             [[ "${selected[$i]}" == "true" ]] && mark="${GREEN}✓${NC}"
             if [[ "$i" -eq "$current" ]]; then
@@ -243,6 +264,7 @@ interactive_remove() {
                 printf "  [${mark}] %-30s [%s]\033[K\n" "$(basename "${paths[$i]}")" "${branches[$i]}"
             fi
         done
+
         printf "\033[K"
     }
 
