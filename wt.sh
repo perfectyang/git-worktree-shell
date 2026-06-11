@@ -770,12 +770,17 @@ case "$command" in
 
         raw_path="$new_path"
         # 获取当前仓库名作为标识
-        repo_name="$(basename "$(dirname "$(git rev-parse --git-common-dir)")")"
+        repo_name="$(basename "$(git rev-parse --show-toplevel)")"
         # 扁平化：repo名-basename 作为 worktree 目录，避免嵌套子目录
         new_path="$(basename "$raw_path")"
+        # 去掉 repo_name 和 new_path 中的 .，并去掉 repo_name 首尾的 -
+        repo_name="${repo_name//[.]/}"
+        repo_name="${repo_name/#[-]/}"
+        repo_name="${repo_name/%[-]/}"
+        new_path="${new_path//[.]/}"
         # 如果原始路径以 ../ 开头，放在同级目录下
         if [[ "$raw_path" == ../* ]]; then
-            new_path="../${repo_name}-$new_path"
+            new_path="../${repo_name}-${new_path}"
         fi
         new_path="$(resolve_path "$new_path")"
 
